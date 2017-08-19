@@ -1,0 +1,10 @@
+server: irc.snoonet.org
+port: 6667
+nickname: Test_12345
+ircname: Test_12345
+username: Highlight
+channels:
+    - "##mike-test"
+    - "##Mike"
+
+highlight_limit: 2
