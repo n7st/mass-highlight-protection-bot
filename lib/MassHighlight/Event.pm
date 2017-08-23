@@ -1,7 +1,7 @@
 package MassHighlight::Event;
 
 use Moose;
-use POE qw(Component::IRC::State);
+use POE qw(Component::IRC::State Component::IRC::Plugin::NickServID);
 use Reflex::POE::Session;
 use Reflex::Trait::Watched qw(watches);
 
@@ -32,6 +32,12 @@ sub BUILD {
     $self->poco_watcher(Reflex::POE::Session->new({
         sid => $self->component->session_id,
     }));
+
+    if ($self->config->{nickserv_password}) {
+        $self->component->plugin_add("NickServID", POE::Component::IRC::Plugin::NickServID->new(
+            Password => $self->config->{nickserv_password},
+        ));
+    }
 
     $self->run_within_session(sub {
         # _start event (POE::Component::IRC::State)

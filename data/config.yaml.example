@@ -3,8 +3,17 @@ port: 6667
 nickname: Test_12345
 ircname: Test_12345
 username: Highlight
+nickserv_password: hunter2
 channels:
     - "##mike-test"
     - "##Mike"
 
-highlight_limit: 2
+# Maximum number of highlights allowed
+highlight_limit: 10 
+
+# Minimum length of the message before the bot is interested
+min_filter_len: 20
+
+# Minimum number of words in the message before the bot is interested
+min_word_count: 5
+
