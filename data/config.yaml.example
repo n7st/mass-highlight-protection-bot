@@ -1,5 +1,5 @@
 server: irc.snoonet.org
-port: 6667
+port: 6697
 nickname: Test_12345
 ircname: Test_12345
 username: Highlight
