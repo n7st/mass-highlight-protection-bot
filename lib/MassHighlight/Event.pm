@@ -1,7 +1,7 @@
 package MassHighlight::Event;
 
 use Moose;
-use POE qw(Component::IRC::State Component::IRC::Plugin::NickServID);
+use POE qw(Component::IRC::State Component::IRC::Plugin::NickServID Component::SSLify);
 use Reflex::POE::Session;
 use Reflex::Trait::Watched qw(watches);
 
@@ -243,6 +243,7 @@ sub _build_component {
         ircname  => $self->config->{ircname},
         username => $self->config->{ident},
         debug    => 1,
+        UseSSL   => $self->config->{ssl},
     ) || die "Bot spawn failure";
 }
 

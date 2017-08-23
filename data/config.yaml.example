@@ -4,6 +4,7 @@ nickname: Test_12345
 ircname: Test_12345
 username: Highlight
 nickserv_password: hunter2
+ssl: 1
 channels:
     - "##mike-test"
     - "##Mike"
