@@ -5,6 +5,7 @@ An IRC bot which bans for mass highlighting in a channel.
 ## Installation
 
 * Clone the repository.
+* Inside the directory, run `dzil listdeps | cpanm`.
 
 ## Usage
 
