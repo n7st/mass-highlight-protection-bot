@@ -77,14 +77,19 @@ sub on_poco_irc_public {
 
     return unless @nicknames;
 
-    my $regexp          = sprintf("(%s)", join("|", @nicknames));
-    my @matches         = $message =~ /$regexp/g;
     my $highlight_limit = $self->config->{highlight_limit} // $self->DEFAULT_HIGHLIGHT_LIMIT;
     my $nickname        = $self->_nick_from_host_string($event->{args}->[0]);
 
+    my %args = map { $_ => 1 } split(/ /, $message);
+    my %seen;
+
+    foreach my $nick (@nicknames) {
+        $seen{$nick} = 1 if $args{$nick};
+    }
+
     my ($hostname) = $event->{args}->[0] =~ /@(.+)$/;
 
-    if ($hostname && scalar @matches >= $highlight_limit) {
+    if ($hostname && scalar keys %seen >= $highlight_limit) {
         if ($self->_has_channel_access($channel)) {
             $self->component->yield("kick" => $channel => $nickname => "Mass highlighting");
             $self->component->yield("mode" => $channel." +b *!*\@".$hostname);
