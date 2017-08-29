@@ -1,28 +1,29 @@
 package MassHighlight::Event;
 
+use Carp;
 use Moose;
 use POE qw(Component::IRC::State Component::IRC::Plugin::NickServID Component::SSLify);
 use Reflex::POE::Session;
 use Reflex::Trait::Watched qw(watches);
 
-extends "Reflex::Base";
+extends 'Reflex::Base';
 
-use constant {
-    DEFAULT_HIGHLIGHT_LIMIT => 10,
-    DEFAULT_MIN_FILTER_LEN  => 20,
-    DEFAULT_MIN_WORD_COUNT  => 5,
-};
+our $VERSION = 0.01;
 
 ################################################################################
 
-has config => (is => "rw", isa => "HashRef", required => 1);
+has config => (is => 'rw', isa => 'HashRef', required => 1);
 
-has channels => (is => "rw", isa => "HashRef", default => sub { {} });
+has channels => (is => 'rw', isa => 'HashRef', default => sub { {} });
 
-has component       => (is => "rw", isa => "POE::Component::IRC::State", lazy_build => 1);
-has actual_nickname => (is => "rw", isa => "Str",                        lazy_build => 1);
+has component       => (is => 'rw', isa => 'POE::Component::IRC::State', lazy_build => 1);
+has actual_nickname => (is => 'rw', isa => 'Str',                        lazy_build => 1);
 
-watches poco_watcher => (is => "rw", isa => "Reflex::POE::Session", role => "poco");
+has default_highlight_limit   => (is => 'ro', isa => 'Int', default => 10);
+has default_min_filter_length => (is => 'ro', isa => 'Int', default => 20);
+has default_min_word_count    => (is => 'ro', isa => 'Int', default => 5);
+
+watches poco_watcher => (is => 'rw', isa => 'Reflex::POE::Session', role => 'poco');
 
 ################################################################################
 
@@ -34,14 +35,14 @@ sub BUILD {
     }));
 
     if ($self->config->{nickserv_password}) {
-        $self->component->plugin_add("NickServID", POE::Component::IRC::Plugin::NickServID->new(
+        $self->component->plugin_add('NickServID', POE::Component::IRC::Plugin::NickServID->new(
             Password => $self->config->{nickserv_password},
         ));
     }
 
     $self->run_within_session(sub {
         # _start event (POE::Component::IRC::State)
-        $self->component->yield(register => "all");
+        $self->component->yield(register => 'all');
         $self->component->yield(connect => {});
     });
 
@@ -53,7 +54,10 @@ sub on_poco_irc_001 {
     my $event = shift;
 
     $self->actual_nickname($self->component->{INFO}->{RealNick});
-    $self->component->yield(join => $_) foreach @{$self->config->{channels}};
+
+    foreach (@{$self->config->{channels}}) {
+        $self->component->yield(join => $_)
+    }
 
     return 1;
 }
@@ -64,37 +68,41 @@ sub on_poco_irc_public {
 
     my $channel    = $event->{args}->[1]->[0];
     my $message    = $event->{args}->[2];
-    my $word_count = () = $message =~ /\s/g;
-    my $min_len    = $self->config->{min_filter_len} // $self->DEFAULT_MIN_FILTER_LEN;
-    my $min_words  = $self->config->{min_word_count} // $self->DEFAULT_MIN_WORD_COUNT;
+    my $word_count = () = $message =~ m/\s/g;
+    my $min_len    = $self->config->{min_filter_len} // $self->default_min_filter_length;
+    my $min_words  = $self->config->{min_word_count} // $self->default_min_word_count;
 
-    unless (length($message) > $min_len && $word_count >= $min_words) {
+    if (!length($message) >= $min_len || $word_count <= $min_words) {
         # Don't do heavy lifting for short messages
         return 1;
     }
 
     my @nicknames = grep { $self->channels->{$channel}->{$_} == 1 } keys %{$self->channels->{$channel}};
 
-    return unless @nicknames;
+    if (!@nicknames) {
+        return;
+    }
 
-    my $highlight_limit = $self->config->{highlight_limit} // $self->DEFAULT_HIGHLIGHT_LIMIT;
+    my $highlight_limit = $self->config->{highlight_limit} // $self->default_highlight_limit;
     my $nickname        = $self->_nick_from_host_string($event->{args}->[0]);
 
-    my %args = map { $_ => 1 } split(/ /, $message);
+    my %args = map { $_ => 1 } split / /, $message;
     my %seen;
 
     foreach my $nick (@nicknames) {
-        $seen{$nick} = 1 if $args{$nick};
+        if ($args{$nick}) {
+            $seen{$nick} = 1;
+        }
     }
 
-    my ($hostname) = $event->{args}->[0] =~ /@(.+)$/;
+    my ($hostname) = $event->{args}->[0] =~ m/@(.+)$/;
 
     if ($hostname && scalar keys %seen >= $highlight_limit) {
         if ($self->_has_channel_access($channel)) {
-            $self->component->yield("kick" => $channel => $nickname => "Mass highlighting");
-            $self->component->yield("mode" => $channel." +b *!*\@".$hostname);
+            $self->component->yield('kick' => $channel => $nickname => 'Mass highlighting');
+            $self->component->yield('mode' => "${channel} +b *!*\@${hostname}");
         } else {
-            warn "I don't have access to perform a ban!";
+            carp 'I don\'t have access to perform a ban!';
         }
     }
 
@@ -112,7 +120,7 @@ sub on_poco_irc_chan_sync {
     my @nicks   = $self->component->channel_list($channel);
 
     my $channel_info = $self->channels;
-    
+
     $channel_info->{$channel} = { map { $_ => 1 } @nicks };
 
     $self->channels($channel_info);
@@ -194,7 +202,7 @@ sub _nick_from_host_string {
     my $self  = shift;
     my $input = shift;
 
-    my ($nickname) = $input =~ /^(.+)!/;
+    my ($nickname) = $input =~ m/^(.+)!/;
 
     return $nickname;
 }
@@ -220,7 +228,7 @@ sub _update_channel_nick_list {
 
 ################################################################################
 
-sub _build_actual_nick {
+sub _build_actual_nickname {
     my $self = shift;
 
     # Default to expected nickname
@@ -238,7 +246,9 @@ sub _build_component {
     );
 
     foreach (keys %required_config_opts) {
-        die "Missing config option: $_" unless $self->config->{$_};
+        if (!$self->config->{$_}) {
+            croak "Missing config option: $_";
+        }
     }
 
     return POE::Component::IRC::State->spawn(
@@ -249,7 +259,7 @@ sub _build_component {
         username => $self->config->{ident},
         debug    => 1,
         UseSSL   => $self->config->{ssl},
-    ) || die "Bot spawn failure";
+    ) || croak 'Bot spawn failure';
 }
 
 ################################################################################
